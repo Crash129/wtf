@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
+	"path/filepath"
 
+	"github.com/fsnotify/fsnotify"
 	_ "github.com/gdamore/tcell/terminfo/extended"
 	"github.com/gdamore/tcell/v2"
 	"github.com/olebedev/config"
-	"github.com/radovskyb/watcher"
 	"github.com/rivo/tview"
+
 	"github.com/wtfutil/wtf/cfg"
 	"github.com/wtfutil/wtf/support"
 	"github.com/wtfutil/wtf/utils"
@@ -199,15 +200,33 @@ func (wtfApp *WtfApp) scheduleWidgets() {
 }
 
 func (wtfApp *WtfApp) watchForConfigChanges() {
-	watch := watcher.New()
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err := watcher.Close(); err != nil {
+			log.Println("failed to close fsnotify watcher:", err)
+		}
+	}()
 
-	// Notify write events
-	watch.FilterOps(watcher.Write)
+	configAbsPath, err := filepath.Abs(wtfApp.configFilePath)
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	go func() {
 		for {
 			select {
-			case <-watch.Event:
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+
+				if !event.Has(fsnotify.Write) || event.Name != configAbsPath {
+					continue
+				}
+
 				wtfApp.Stop()
 
 				config := cfg.LoadWtfConfigFile(wtfApp.configFilePath)
@@ -216,26 +235,21 @@ func (wtfApp *WtfApp) watchForConfigChanges() {
 				utils.Init(config.UString("wtf.openFileUtil", "open"), openURLUtil)
 
 				newApp.Start()
-			case err := <-watch.Error:
-				if err == watcher.ErrWatchedFileDeleted {
-					// Usually happens because the watcher looks for the file as the OS is updating it
-					continue
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
 				}
+
 				log.Fatalln(err)
-			case <-watch.Closed:
-				return
 			}
 		}
 	}()
 
 	// Watch config file for changes.
-	absPath, _ := utils.ExpandHomeDir(wtfApp.configFilePath)
-	if err := watch.Add(absPath); err != nil {
+	if err := watcher.Add(filepath.Dir(configAbsPath)); err != nil {
 		log.Fatalln(err)
 	}
 
-	// Start the watching process - it'll check for changes every 100ms.
-	if err := watch.Start(time.Millisecond * 100); err != nil {
-		log.Fatalln(err)
-	}
+	// Block goroutine forever
+	<-make(chan struct{})
 }

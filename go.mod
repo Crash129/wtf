@@ -54,7 +54,7 @@ require (
 	github.com/zorkian/go-datadog-api v2.30.0+incompatible
 	golang.org/x/oauth2 v0.7.0
 	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.7.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.9.0
 	google.golang.org/api v0.118.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -68,6 +68,7 @@ require github.com/nicklaw5/helix/v2 v2.22.1
 
 require (
 	github.com/charmbracelet/bubbles v0.15.0
+	github.com/fsnotify/fsnotify v1.7.0
 	github.com/gdamore/tcell/v2 v2.6.0
 	github.com/hekmon/transmissionrpc/v2 v2.0.1
 	github.com/logrusorgru/aurora/v4 v4.0.0
